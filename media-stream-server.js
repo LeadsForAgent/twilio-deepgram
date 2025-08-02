@@ -59,6 +59,6 @@ wss.on('connection', function connection(ws) {
   });
 });
 
-server.listen(2004, () => {
-  console.log('✅ WebSocket server listening at http://localhost:2004/ws');
+server.listen(process.env.PORT || 2004, () => {
+  console.log(`✅ WebSocket server listening at http://localhost:${process.env.PORT || 2004}/ws`);
 });
