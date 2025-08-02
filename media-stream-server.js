@@ -3,12 +3,13 @@ const http = require('http');
 const WebSocket = require('ws');
 const { createClient } = require('@deepgram/sdk');
 
-const deepgram = createClient('YOUR_DEEPGRAM_API_KEY'); // Replace with your real Deepgram key
+// 🔑 Replace with your real Deepgram key (consider using process.env for security)
+const deepgram = createClient('YOUR_DEEPGRAM_API_KEY');
 
 const server = http.createServer();
 const wss = new WebSocket.Server({ server, path: '/ws' });
 
-console.log("✅ WebSocket server running at ws://localhost:2004/ws");
+console.log("✅ WebSocket server initializing...");
 
 wss.on('connection', function connection(ws) {
   console.log('🔌 Twilio Media Stream connected');
@@ -59,6 +60,8 @@ wss.on('connection', function connection(ws) {
   });
 });
 
-server.listen(process.env.PORT || 2004, () => {
-  console.log(`✅ WebSocket server listening at http://localhost:${process.env.PORT || 2004}/ws`);
+// ✅ Required for Render — use ONLY process.env.PORT
+const PORT = process.env.PORT;
+server.listen(PORT, () => {
+  console.log(`✅ WebSocket server listening at http://0.0.0.0:${PORT}/ws`);
 });
