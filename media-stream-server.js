@@ -3,10 +3,13 @@ const http = require('http');
 const WebSocket = require('ws');
 const { createClient } = require('@deepgram/sdk');
 
-// 🔑 Replace with your real Deepgram key (consider using process.env for security)
-const deepgram = createClient('YOUR_DEEPGRAM_API_KEY');
+// ✅ Load Deepgram API key from environment variable
+const deepgram = createClient(process.env.DEEPGRAM_API_KEY); // DO NOT hardcode your key
 
+// ✅ Create HTTP server
 const server = http.createServer();
+
+// ✅ Attach WebSocket server at /ws
 const wss = new WebSocket.Server({ server, path: '/ws' });
 
 console.log("✅ WebSocket server initializing...");
@@ -60,8 +63,9 @@ wss.on('connection', function connection(ws) {
   });
 });
 
-// ✅ Required for Render — use ONLY process.env.PORT
-const PORT = process.env.PORT;
-server.listen(PORT, () => {
+// ✅ Bind to 0.0.0.0 and Render PORT for public detection
+const PORT = process.env.PORT || 2004;
+
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`✅ WebSocket server listening at http://0.0.0.0:${PORT}/ws`);
 });
