@@ -32,7 +32,7 @@ app.post('/gather-response', (req, res) => {
 
   const response = new twiml.VoiceResponse();
   response.start().stream({
-    url: 'wss://48715b34d842.ngrok-free.app/ws'
+    url: 'wss://websocket-server-4746.onrender.com/ws'
   });
 
   response.say("Streaming audio now.");
