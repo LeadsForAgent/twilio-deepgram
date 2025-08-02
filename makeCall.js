@@ -16,7 +16,7 @@ const toPhoneNumber = '+16476797406';
 const contactName = 'Adity test';
 const fromPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
 
-const TWILIO_WEBHOOK_URL = 'https://express-server-rsa4.onrender.com/voice';
+const TWILIO_WEBHOOK_URL = 'https://express-server-rsa4.onrender.com/twilio-webhook';
 
 async function makeCall() {
   try {
