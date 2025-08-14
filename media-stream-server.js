@@ -1,10 +1,16 @@
-// ✅ media-stream-server.js
+require('dotenv').config();
 const http = require('http');
 const WebSocket = require('ws');
 const { createClient } = require('@deepgram/sdk');
+const OpenAI = require('openai');
 
-// ✅ Load Deepgram API key from environment variable
-const deepgram = createClient(process.env.DEEPGRAM_API_KEY); // DO NOT hardcode your key
+// ✅ Initialize OpenAI
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+// ✅ Initialize Deepgram
+const deepgram = createClient(process.env.DEEPGRAM_API_KEY);
 
 // ✅ Create HTTP server
 const server = http.createServer();
@@ -28,10 +34,36 @@ wss.on('connection', function connection(ws) {
     console.log('✅ Deepgram connection opened');
   });
 
-  dgConnection.on('transcriptReceived', (data) => {
+  // ✅ STEP: Transcript → GPT
+  dgConnection.on('transcriptReceived', async (data) => {
     const transcript = data.channel?.alternatives?.[0]?.transcript;
-    if (transcript) {
+
+    if (transcript && transcript.trim() !== '') {
       console.log('📝 Transcript:', transcript);
+
+      try {
+        const response = await openai.chat.completions.create({
+          model: 'gpt-3.5-turbo',
+          messages: [
+            {
+              role: 'system',
+              content: 'You are Ava, a friendly and professional real estate assistant. Give short, helpful replies.',
+            },
+            {
+              role: 'user',
+              content: transcript
+            }
+          ],
+          temperature: 0.7
+        });
+
+        const reply = response.choices[0].message.content;
+        console.log('🤖 GPT Reply:', reply);
+
+        // 🚨 Optional next: Stream reply back to user with TTS or log it
+      } catch (err) {
+        console.error('❌ GPT Error:', err.message);
+      }
     }
   });
 
