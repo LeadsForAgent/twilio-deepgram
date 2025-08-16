@@ -12,8 +12,16 @@ const openai = new OpenAI({
 // ✅ Initialize Deepgram
 const deepgram = createClient(process.env.DEEPGRAM_API_KEY);
 
-// ✅ Create HTTP server
-const server = http.createServer();
+// ✅ Create HTTP server (Render needs this!)
+const server = http.createServer((req, res) => {
+  if (req.url === '/') {
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('WebSocket server running.');
+  } else {
+    res.writeHead(404);
+    res.end();
+  }
+});
 
 // ✅ Attach WebSocket server at /ws
 const wss = new WebSocket.Server({ server, path: '/ws' });
@@ -34,7 +42,15 @@ wss.on('connection', function connection(ws) {
     console.log('✅ Deepgram connection opened');
   });
 
-  // ✅ STEP: Transcript → GPT
+  dgConnection.on('error', (err) => {
+    console.error('❌ Deepgram error:', err);
+  });
+
+  dgConnection.on('close', () => {
+    console.log('🛑 Deepgram connection closed');
+  });
+
+  // ✅ Transcript → GPT
   dgConnection.on('transcriptReceived', async (data) => {
     const transcript = data.channel?.alternatives?.[0]?.transcript;
 
@@ -60,22 +76,19 @@ wss.on('connection', function connection(ws) {
         const reply = response.choices[0].message.content;
         console.log('🤖 GPT Reply:', reply);
 
-        // 🚨 Optional next: Stream reply back to user with TTS or log it
+        // Optional: TTS or reply via WebSocket could be added here
       } catch (err) {
         console.error('❌ GPT Error:', err.message);
       }
     }
   });
 
-  dgConnection.on('error', (err) => {
-    console.error('❌ Deepgram error:', err);
-  });
-
+  // ✅ Incoming audio from Twilio Media Stream
   ws.on('message', function incoming(message) {
     const data = JSON.parse(message);
 
     if (data.event === 'start') {
-      console.log('▶️ Streaming started for:', data.streamSid);
+      console.log(`▶️ Streaming started | Call SID: ${data.start.callSid}`);
     }
 
     if (data.event === 'media') {
@@ -90,14 +103,13 @@ wss.on('connection', function connection(ws) {
   });
 
   ws.on('close', () => {
-    console.log('🔒 WebSocket closed');
+    console.log('🔒 WebSocket connection closed');
     dgConnection.finish();
   });
 });
 
-// ✅ Bind to 0.0.0.0 and Render PORT for public detection
+// ✅ Listen on port for Render to detect
 const PORT = process.env.PORT || 2004;
-
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`✅ WebSocket server listening at http://0.0.0.0:${PORT}/ws`);
+  console.log(`✅ WebSocket server listening on http://0.0.0.0:${PORT}/ws`);
 });
