@@ -52,10 +52,10 @@ wss.on('connection', function connection(ws) {
 
   // ✅ Transcript → GPT
   dgConnection.on('transcriptReceived', async (data) => {
-    const transcript = data.channel?.alternatives?.[0]?.transcript;
+  const transcript = data.channel?.alternatives?.[0]?.transcript;
 
-    if (transcript && transcript.trim() !== '') {
-      console.log('📝 Transcript:', transcript);
+  if (transcript && transcript.trim() !== '') {
+    console.log('📝 Transcript:', transcript);
 
       try {
         const response = await openai.chat.completions.create({
@@ -82,29 +82,30 @@ wss.on('connection', function connection(ws) {
   });
 
   // ✅ Incoming audio from Twilio Media Stream
-  ws.on('message', function incoming(message) {
-    const data = JSON.parse(message);
+ws.on('message', function incoming(message) {
+  const data = JSON.parse(message);
 
-    if (data.event === 'start') {
-      console.log(`▶️ Streaming started | Call SID: ${data.start.callSid}`);
-    }
+  if (data.event === 'start') {
+    console.log(`▶️ Streaming started | Call SID: ${data.start.callSid}`);
+  }
 
-    if (data.event === 'media') {
-      const audio = Buffer.from(data.media.payload, 'base64');
-      dgConnection.send(audio);
-    }
+  if (data.event === 'media') {
+    const audio = Buffer.from(data.media.payload, 'base64');
+    console.log(`🎧 Received audio packet: ${audio.length} bytes`);
+    dgConnection.send(audio);
+  }
 
-    if (data.event === 'stop') {
-      console.log('⛔ Streaming stopped');
-      dgConnection.finish();
-    }
-  });
-
-  ws.on('close', () => {
-    console.log('🔒 WebSocket connection closed');
+  if (data.event === 'stop') {
+    console.log('⛔ Streaming stopped');
     dgConnection.finish();
-  });
+  }
 });
+
+ws.on('close', () => {
+  console.log('🔒 WebSocket connection closed');
+  dgConnection.finish();
+});
+
 
 // ✅ Start the server
 const PORT = process.env.PORT || 10000;
