@@ -6,6 +6,7 @@ const { twiml } = require('twilio');
 const { createClient } = require('@deepgram/sdk');
 const { OpenAI } = require('openai');
 
+// ✅ Initialize AI clients
 const deepgram = createClient(process.env.DEEPGRAM_API_KEY);
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -36,30 +37,36 @@ async function getChatGPTResponse(text) {
   }
 }
 
-// 📡 Twilio Webhook
+// 📞 Twilio Webhook — handles the start of the call
 app.post('/twilio-webhook', (req, res) => {
   console.log('📞 Incoming call: /twilio-webhook');
+
   const response = new twiml.VoiceResponse();
-  response.gather({ numDigits: 1, action: '/gather-response', method: 'POST' })
-    .say('Press any key to begin.');
+  response.gather({
+    numDigits: 1,
+    action: '/gather-response',
+    method: 'POST'
+  }).say('Press any key to begin.');
+
   res.type('text/xml').send(response.toString());
 });
 
-// 📲 On keypress, start media stream
+// 🎯 When digit is pressed, start Twilio <Stream> to /ws
 app.post('/gather-response', (req, res) => {
   console.log('🎯 Key pressed. Starting stream...');
-  const streamUrl = process.env.LOCAL_TEST === 'true'
-    ? 'ws://localhost:2004/ws'
-    : `wss://${process.env.RENDER_EXTERNAL_URL}/ws`;
+
+  // ✅ Hardcoded WebSocket stream URL (for Render deployment)
+  const streamUrl = 'wss://twilio-deepgram-et1q.onrender.com/ws';
 
   const response = new twiml.VoiceResponse();
   response.start().stream({ url: streamUrl });
   response.say('You may speak now.');
-  response.pause({ length: 15 }); // Keep call open
+  response.pause({ length: 15 }); // Keep call open for 15 seconds
+
   res.type('text/xml').send(response.toString());
 });
 
-// 🔌 WebSocket connection handler
+// 🔌 WebSocket → Deepgram → GPT
 wss.on('connection', ws => {
   console.log('🔌 WebSocket connected');
 
@@ -74,26 +81,25 @@ wss.on('connection', ws => {
   dg.on('close', () => console.log('🛑 Deepgram closed'));
 
   dg.on('transcriptReceived', async (data) => {
-    try {
-      const text = data.channel.alternatives[0]?.transcript;
-      if (text && text.trim() !== '') {
-        console.log('📝 Transcript:', text);
-        const reply = await getChatGPTResponse(text);
-        if (reply) {
-          console.log('📢 Response to user:', reply);
-          // Optional: use Twilio to say this back to user via a secondary call
-        }
+    const text = data.channel?.alternatives?.[0]?.transcript;
+    if (text && text.trim() !== '') {
+      console.log('📝 Transcript:', text);
+      const reply = await getChatGPTResponse(text);
+      if (reply) {
+        console.log('📢 Response to user:', reply);
+        // You could trigger TTS here if desired
       }
-    } catch (err) {
-      console.error('❌ Transcript processing error:', err.message);
     }
   });
 
   ws.on('message', msg => {
     const d = JSON.parse(msg);
+
     if (d.event === 'media') {
-      dg.send(Buffer.from(d.media.payload, 'base64'));
+      const audio = Buffer.from(d.media.payload, 'base64');
+      dg.send(audio);
     }
+
     if (d.event === 'stop') {
       console.log('🛑 Call stopped.');
       dg.finish();

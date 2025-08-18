@@ -12,11 +12,11 @@ const openai = new OpenAI({
 // ✅ Initialize Deepgram
 const deepgram = createClient(process.env.DEEPGRAM_API_KEY);
 
-// ✅ Create HTTP server (Render needs this!)
+// ✅ Create HTTP server (Render needs this for health check)
 const server = http.createServer((req, res) => {
   if (req.url === '/') {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('WebSocket server running.');
+    res.end('✅ WebSocket server running.');
   } else {
     res.writeHead(404);
     res.end();
@@ -75,8 +75,6 @@ wss.on('connection', function connection(ws) {
 
         const reply = response.choices[0].message.content;
         console.log('🤖 GPT Reply:', reply);
-
-        // Optional: TTS or reply via WebSocket could be added here
       } catch (err) {
         console.error('❌ GPT Error:', err.message);
       }
@@ -108,8 +106,8 @@ wss.on('connection', function connection(ws) {
   });
 });
 
-// ✅ Listen on port for Render to detect
-const PORT = process.env.PORT || 2004;
+// ✅ Make server listen on correct Render-detected port
+const PORT = process.env.PORT || 10000;
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`✅ WebSocket server listening on http://0.0.0.0:${PORT}/ws`);
 });
