@@ -1,7 +1,7 @@
 require('dotenv').config();
 const http = require('http');
 const WebSocket = require('ws');
-const { createClient } = require('@deepgram/sdk');
+const { Deepgram } = require('@deepgram/sdk');
 const OpenAI = require('openai');
 
 // ✅ Initialize OpenAI
@@ -9,10 +9,10 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// ✅ Initialize Deepgram
-const deepgram = createClient(process.env.DEEPGRAM_API_KEY);
+// ✅ Initialize Deepgram WebSocket client
+const deepgram = new Deepgram(process.env.DEEPGRAM_API_KEY);
 
-// ✅ Create HTTP server (Render needs this for health check)
+// ✅ Create HTTP server (needed for Render health checks)
 const server = http.createServer((req, res) => {
   if (req.url === '/') {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
@@ -31,7 +31,7 @@ console.log("✅ WebSocket server initializing...");
 wss.on('connection', function connection(ws) {
   console.log('🔌 Twilio Media Stream connected');
 
-  const dgConnection = deepgram.listen.live({
+  const dgConnection = deepgram.transcription.live({
     model: 'nova',
     language: 'en-US',
     smart_format: true,
@@ -106,7 +106,7 @@ wss.on('connection', function connection(ws) {
   });
 });
 
-// ✅ Make server listen on correct Render-detected port
+// ✅ Start the server
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`✅ WebSocket server listening on http://0.0.0.0:${PORT}/ws`);
