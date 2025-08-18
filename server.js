@@ -23,7 +23,7 @@ async function getChatGPTResponse(text) {
     const response = await openai.chat.completions.create({
       model: 'gpt-3.5-turbo',
       messages: [
-        { role: 'system', content: 'You are a helpful real estate assistant.' },
+        { role: 'system', content: 'You are Ava, a friendly and professional real estate assistant. Give short, helpful replies.' },
         { role: 'user', content: text }
       ]
     });
@@ -55,13 +55,12 @@ app.post('/twilio-webhook', (req, res) => {
 app.post('/gather-response', (req, res) => {
   console.log('🎯 Key pressed. Starting stream...');
 
-  // ✅ Hardcoded WebSocket stream URL (for Render deployment)
-  const streamUrl = 'wss://twilio-deepgram-et1q.onrender.com/ws';
+  const streamUrl = 'wss://twilio-deepgram-et1q.onrender.com/ws'; // ✅ Update to your Render WebSocket URL
 
   const response = new twiml.VoiceResponse();
   response.start().stream({ url: streamUrl });
-  response.say('You may speak now.');
-  response.pause({ length: 15 }); // Keep call open for 15 seconds
+  response.say('Hi, I’m Ava. How can I help you today?');
+  response.pause({ length: 15 }); // Keep the line open
 
   res.type('text/xml').send(response.toString());
 });
@@ -73,12 +72,13 @@ wss.on('connection', ws => {
   const dg = deepgram.listen.live({
     model: 'nova',
     language: 'en-US',
+    smart_format: true,
     punctuate: true
   });
 
   dg.on('open', () => console.log('✅ Deepgram live transcription started'));
   dg.on('error', err => console.error('❌ Deepgram error:', err));
-  dg.on('close', () => console.log('🛑 Deepgram closed'));
+  dg.on('close', () => console.log('🛑 Deepgram connection closed'));
 
   dg.on('transcriptReceived', async (data) => {
     const text = data.channel?.alternatives?.[0]?.transcript;
@@ -86,8 +86,8 @@ wss.on('connection', ws => {
       console.log('📝 Transcript:', text);
       const reply = await getChatGPTResponse(text);
       if (reply) {
-        console.log('📢 Response to user:', reply);
-        // You could trigger TTS here if desired
+        console.log('📢 GPT Response:', reply);
+        // You could use Twilio <Say> here if enabling speech output
       }
     }
   });
@@ -95,19 +95,23 @@ wss.on('connection', ws => {
   ws.on('message', msg => {
     const d = JSON.parse(msg);
 
+    if (d.event === 'start') {
+      console.log(`▶️ Streaming started | Call SID: ${d.start.callSid}`);
+    }
+
     if (d.event === 'media') {
       const audio = Buffer.from(d.media.payload, 'base64');
       dg.send(audio);
     }
 
     if (d.event === 'stop') {
-      console.log('🛑 Call stopped.');
+      console.log('⛔ Call ended.');
       dg.finish();
     }
   });
 
   ws.on('close', () => {
-    console.log('🔌 WebSocket closed');
+    console.log('🔌 WebSocket connection closed');
     dg.finish();
   });
 });
