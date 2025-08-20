@@ -48,16 +48,23 @@ app.post('/twilio-webhook', (req, res) => {
 });
 
 // 🔁 After keypress, initiate stream
-app.post('/gather-response', (req, res) => {
-  console.log('🎯 Key pressed, starting stream...');
-  const response = new twiml.VoiceResponse();
-  response.start().stream({
-    url: 'wss://twilio-deepgram-et1q.onrender.com/ws'
+const { twiml: { VoiceResponse } } = require('twilio');
+
+app.post('/voice', (req, res) => {
+  const response = new VoiceResponse();
+
+  const gather = response.gather({
+    input: 'dtmf',
+    action: '/gather-response',
+    numDigits: 1,
+    timeout: 5
   });
-  response.say("You may begin speaking now.");
-  response.pause({ length: 30 }); // Hold line open
+
+  gather.say("Hi, I'm Ava. Press any key to start talking.");
+
   res.type('text/xml').send(response.toString());
 });
+
 
 // 🔌 WebSocket Connection (Twilio -> Deepgram -> GPT)
 wss.on('connection', ws => {
