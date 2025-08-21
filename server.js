@@ -6,7 +6,6 @@ const { twiml } = require('twilio');
 const { createClient } = require('@deepgram/sdk');
 const { OpenAI } = require('openai');
 
-// ✅ Initialize Clients
 const deepgram = createClient(process.env.DEEPGRAM_API_KEY);
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -17,7 +16,35 @@ const wss = new WebSocket.Server({ server, path: '/ws' });
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
 
-// 🔹 GPT response handler
+const { VoiceResponse } = twiml;
+
+// ✅ Entry Route — Twilio calls this first
+app.post('/voice', (req, res) => {
+  console.log('📞 Incoming call');
+  const response = new VoiceResponse();
+  const gather = response.gather({
+    input: 'dtmf',
+    action: '/gather-response',
+    numDigits: 1,
+    timeout: 5
+  });
+  gather.say("Hi, I'm Ava. Press any key to start talking.");
+  res.type('text/xml').send(response.toString());
+});
+
+// ✅ After Keypress — Start Stream
+app.post('/gather-response', (req, res) => {
+  console.log('🎯 Key pressed, starting stream...');
+  const response = new VoiceResponse();
+  response.start().stream({
+    url: 'wss://twilio-deepgram-et1q.onrender.com/ws'
+  });
+  response.say("You may begin speaking now.");
+  response.pause({ length: 30 });
+  res.type('text/xml').send(response.toString());
+});
+
+// ✅ GPT Helper
 async function getGPTReply(text) {
   try {
     const completion = await openai.chat.completions.create({
@@ -35,38 +62,7 @@ async function getGPTReply(text) {
   }
 }
 
-// 🔁 Twilio webhook: Prompt for keypress
-app.post('/twilio-webhook', (req, res) => {
-  console.log('📞 Incoming call');
-  const response = new twiml.VoiceResponse();
-  response.gather({
-    numDigits: 1,
-    action: '/gather-response',
-    method: 'POST'
-  }).say("Hi, I’m Ava. Press any key to begin.");
-  res.type('text/xml').send(response.toString());
-});
-
-// 🔁 After keypress, initiate stream
-const { twiml: { VoiceResponse } } = require('twilio');
-
-app.post('/voice', (req, res) => {
-  const response = new VoiceResponse();
-
-  const gather = response.gather({
-    input: 'dtmf',
-    action: '/gather-response',
-    numDigits: 1,
-    timeout: 5
-  });
-
-  gather.say("Hi, I'm Ava. Press any key to start talking.");
-
-  res.type('text/xml').send(response.toString());
-});
-
-
-// 🔌 WebSocket Connection (Twilio -> Deepgram -> GPT)
+// ✅ WebSocket → Deepgram → GPT
 wss.on('connection', ws => {
   console.log('🔌 WebSocket connected');
 
@@ -114,7 +110,7 @@ wss.on('connection', ws => {
   });
 });
 
-// 🚀 Start server
+// ✅ Start Server
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`✅ Server listening on http://0.0.0.0:${PORT}`);
