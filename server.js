@@ -40,7 +40,7 @@ app.post('/gather-response', (req, res) => {
     url: 'wss://twilio-deepgram-et1q.onrender.com/ws'
   });
   response.say("You may begin speaking now.");
-  response.pause({ length: 30 });
+  response.pause({ length: 999 });
   res.type('text/xml').send(response.toString());
 });
 
