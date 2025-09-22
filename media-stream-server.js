@@ -6,7 +6,7 @@ require('dotenv').config();
 const deepgram = new Deepgram(process.env.DEEPGRAM_API_KEY);
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-const wss = new WebSocket.Server({ port: 2004 });
+const wss = new WebSocket.Server({ port: 10000 });
 
 wss.on('connection', function connection(ws) {
   console.log('🔌 Twilio Media Stream connected');
