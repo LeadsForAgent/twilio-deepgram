@@ -13,7 +13,7 @@ wss.on('connection', function connection(ws) {
 
   const dgConnection = deepgram.transcription.live(
     {
-      model: 'nova',
+      model: 'nova-2',
       language: 'en-US',
       smart_format: true,
       punctuate: true,
