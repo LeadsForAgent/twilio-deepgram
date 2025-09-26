@@ -40,36 +40,33 @@ wss.on('connection', function connection(ws) {
   });
 
   dgConnection.on('transcriptReceived', async (data) => {
-    const transcript = data.channel?.alternatives?.[0]?.transcript;
+  const transcript = data.channel?.alternatives?.[0]?.transcript;
 
-    if (transcript && transcript.trim() !== '') {
-      console.log('📝 Transcript:', transcript);
+  if (transcript && transcript.trim() !== '') {
+    console.log('📝 Transcript:', transcript);
 
-      try {
-        const response = await openai.chat.completions.create({
-          model: 'gpt-4o',
-          messages: [
-            {
-              role: 'system',
-              content: 'You are Ava, a friendly and professional real estate assistant. Give short, helpful replies.',
-            },
-            {
-              role: 'user',
-              content: transcript
-            }
-          ],
-          temperature: 0.7
-        });
+    try {
+      const response = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [
+          { role: 'system', content: 'You are Ava...' },
+          { role: 'user', content: transcript }
+        ],
+        temperature: 0.7
+      });
 
-        const reply = response.choices[0].message.content;
-        console.log('🤖 GPT Reply:', reply);
-      } catch (err) {
-        console.error('❌ GPT Error:', err.message);
-      }
-    } else {
-      console.log('📭 No transcript received or empty input');
+      const reply = response.choices?.[0]?.message?.content;
+      console.log('🤖 GPT Reply:', reply || '❌ Empty GPT reply');
+
+    } catch (err) {
+      console.error('❌ GPT Error:', err.response?.data || err.message);
     }
-  });
+
+  } else {
+    console.log('📭 No transcript received or empty input');
+  }
+});
+
 
   ws.on('message', function incoming(message) {
     const data = JSON.parse(message);
