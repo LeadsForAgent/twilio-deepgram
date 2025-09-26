@@ -19,11 +19,11 @@ wss.on('connection', function connection(ws) {
       punctuate: true,
       interim_results: false,
       encoding: 'mulaw',
-      sample_rate: 8000,
+      sample_rate: 16000,
       channels: 1
     },
     {
-      'Content-Type': 'audio/x-raw;encoding=mulaw;rate=8000;channels=1'
+      'Content-Type': 'audio/x-raw;encoding=mulaw;rate=16000;channels=1'
     }
   );
 
