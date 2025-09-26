@@ -89,8 +89,11 @@ wss.on('connection', function connection(ws) {
     }
   });
 
-  ws.on('close', () => {
-    console.log('🔒 WebSocket connection closed');
+ws.on('close', () => {
+  console.log('🔒 WebSocket connection closed');
+  setTimeout(() => {
     dgConnection.finish();
-  });
+    console.log('🧹 Finished Deepgram connection after delay');
+  }, 2000); // 2 seconds buffer
+});
 });
