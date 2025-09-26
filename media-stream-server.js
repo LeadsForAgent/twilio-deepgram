@@ -17,7 +17,7 @@ wss.on('connection', function connection(ws) {
       language: 'en-US',
       smart_format: true,
       punctuate: true,
-      interim_results: true,
+      interim_results: false,
       encoding: 'mulaw',
       sample_rate: 8000,
       channels: 1
