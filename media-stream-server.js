@@ -1,9 +1,9 @@
 const WebSocket = require('ws');
-const { Deepgram } = require('@deepgram/sdk');
+const { createClient } = require('@deepgram/sdk');
 const { OpenAI } = require('openai');
 require('dotenv').config();
 
-const deepgram = new Deepgram(process.env.DEEPGRAM_API_KEY);
+const dgClient = createClient(process.env.DEEPGRAM_API_KEY);
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const wss = new WebSocket.Server({ port: 10000 });
@@ -11,7 +11,7 @@ const wss = new WebSocket.Server({ port: 10000 });
 wss.on('connection', function connection(ws) {
   console.log('🔌 Twilio Media Stream connected');
 
-  const dgConnection = deepgram.transcription.live(
+  const dgConnection = dgClient.listen.live(
     {
       model: 'nova',
       language: 'en-US',
