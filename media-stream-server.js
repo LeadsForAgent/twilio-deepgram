@@ -40,7 +40,9 @@ wss.on('connection', function connection(ws) {
   });
 
   dgConnection.on('transcriptReceived', async (data) => {
+  console.log('🧠 Full Deepgram transcript:', JSON.stringify(data, null, 2)); // ✅ DEBUG LOG
   const transcript = data.channel?.alternatives?.[0]?.transcript;
+
 
   if (transcript && transcript.trim() !== '') {
     console.log('📝 Transcript:', transcript);
@@ -69,7 +71,9 @@ wss.on('connection', function connection(ws) {
 
 
   ws.on('message', function incoming(message) {
-    const data = JSON.parse(message);
+  console.log('🔁 Incoming WS message:', message);  // ✅ DEBUG LOG
+  const data = JSON.parse(message);
+
 
     if (data.event === 'start') {
       console.log(`▶️ Streaming started | Call SID: ${data.start.callSid}`);
