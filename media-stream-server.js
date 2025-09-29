@@ -3,8 +3,9 @@ const { Deepgram } = require('@deepgram/sdk');
 const { OpenAI } = require('openai');
 require('dotenv').config();
 
-const dgClient = new Deepgram(process.env.DEEPGRAM_API_KEY);
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const { createClient } = require('@deepgram/sdk');
+const dgClient = createClient(process.env.DEEPGRAM_API_KEY);
+
 
 const wss = new WebSocket.Server({ port: 10000 });
 
@@ -15,7 +16,7 @@ wss.on('connection', function connection(ws) {
   let audioBufferQueue = [];
 
   // ✅ Set up Deepgram live transcription with correct headers
-  const dgConnection = dgClient.transcription.live({
+  const dgConnection = dgClient.transcript.live({
     model: 'nova',
     language: 'en-US',
     smart_format: true,
