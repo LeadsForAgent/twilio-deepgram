@@ -83,14 +83,21 @@ wss.on('connection', function connection(ws) {
     }
 
     if (data.event === 'media') {
-      const audio = Buffer.from(data.media.payload, 'base64');
+  const audio = Buffer.from(data.media.payload, 'base64');
 
-      if (dgConnectionReady) {
-        dgConnection.send(audio);
-      } else {
-        audioBufferQueue.push(audio); // 🧠 Buffer until Deepgram ready
-      }
-    }
+  if (!audio || audio.length === 0) {
+    console.warn('⚠ Received EMPTY audio chunk');
+  } else {
+    console.log(`📦 Received audio chunk | Size: ${audio.length} bytes`);
+  }
+
+  // ✅ Send to Deepgram
+  dgConnection.send(audio);
+
+  // ✅ Write to local file for debugging (optional)
+  audioStream.write(audio);
+}
+
 
     if (data.event === 'stop') {
       console.log('⛔ Streaming stopped by Twilio');
