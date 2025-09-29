@@ -1,42 +1,40 @@
 const WebSocket = require('ws');
-const { createClient } = require('@deepgram/sdk');
+const { Deepgram } = require('@deepgram/sdk');
 const { OpenAI } = require('openai');
-const fs = require('fs');
 require('dotenv').config();
 
-// ✅ Initialize Deepgram
-const dgClient = createClient(process.env.DEEPGRAM_API_KEY);
-
-// ✅ Initialize OpenAI
+const dgClient = new Deepgram(process.env.DEEPGRAM_API_KEY);
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// ✅ Setup raw audio logging (for debugging)
-const audioStream = fs.createWriteStream('audio.raw');
-
-// ✅ WebSocket Server
 const wss = new WebSocket.Server({ port: 10000 });
 
 wss.on('connection', function connection(ws) {
   console.log('🔌 Twilio Media Stream connected');
 
-  const dgConnection = dgClient.listen.live(
-    {
-      model: 'nova',
-      language: 'en-US',
-      smart_format: true,
-      punctuate: true,
-      interim_results: true,
-      encoding: 'mulaw',
-      sample_rate: 8000,
-      channels: 1
-    },
-    {
-      'Content-Type': 'audio/x-raw;encoding=mulaw;rate=8000;channels=1'
-    }
-  );
+  let dgConnectionReady = false;
+  let audioBufferQueue = [];
+
+  // ✅ Set up Deepgram live transcription with correct headers
+  const dgConnection = dgClient.transcription.live({
+    model: 'nova',
+    language: 'en-US',
+    smart_format: true,
+    punctuate: true,
+    interim_results: true,
+    encoding: 'mulaw',
+    sample_rate: 8000,
+    channels: 1
+  }, {
+    'Content-Type': 'audio/x-raw;encoding=mulaw;rate=8000;channels=1'
+  });
 
   dgConnection.on('open', () => {
     console.log('✅ Deepgram connection opened');
+    dgConnectionReady = true;
+
+    // Flush buffered audio if any
+    audioBufferQueue.forEach(audio => dgConnection.send(audio));
+    audioBufferQueue = [];
   });
 
   dgConnection.on('error', (err) => {
@@ -48,10 +46,7 @@ wss.on('connection', function connection(ws) {
   });
 
   dgConnection.on('transcriptReceived', async (data) => {
-    console.log('🧠 Full Deepgram transcript:', JSON.stringify(data, null, 2));
-
     const transcript = data.channel?.alternatives?.[0]?.transcript;
-
     if (transcript && transcript.trim() !== '') {
       console.log('📝 Transcript:', transcript);
 
@@ -67,18 +62,21 @@ wss.on('connection', function connection(ws) {
 
         const reply = response.choices?.[0]?.message?.content;
         console.log('🤖 GPT Reply:', reply || '❌ Empty GPT reply');
+
       } catch (err) {
         console.error('❌ GPT Error:', err.response?.data || err.message);
       }
-    } else {
-      console.log('📭 No transcript received or empty input');
     }
   });
 
-  let chunkCount = 0;
-
   ws.on('message', function incoming(message) {
-    const data = JSON.parse(message);
+    let data;
+    try {
+      data = JSON.parse(message);
+    } catch (e) {
+      console.warn('⚠️ Non-JSON message received. Ignored.');
+      return;
+    }
 
     if (data.event === 'start') {
       console.log(`▶️ Streaming started | Call SID: ${data.start.callSid}`);
@@ -86,21 +84,18 @@ wss.on('connection', function connection(ws) {
 
     if (data.event === 'media') {
       const audio = Buffer.from(data.media.payload, 'base64');
-      chunkCount++;
 
-      console.log(`📦 Received audio chunk #${chunkCount} | Size: ${audio.length} bytes`);
-
-      // ✅ Send audio to Deepgram
-      dgConnection.send(audio);
-
-      // ✅ Also write audio to raw file for debugging
-      audioStream.write(audio);
+      if (dgConnectionReady) {
+        dgConnection.send(audio);
+      } else {
+        audioBufferQueue.push(audio); // 🧠 Buffer until Deepgram ready
+      }
     }
 
     if (data.event === 'stop') {
       console.log('⛔ Streaming stopped by Twilio');
       setTimeout(() => {
-        dgConnection.requestClose();
+        dgConnection.finish();
         console.log('🧹 Gracefully ended Deepgram session (via stop event)');
       }, 2000);
     }
@@ -109,7 +104,7 @@ wss.on('connection', function connection(ws) {
   ws.on('close', () => {
     console.log('🔒 WebSocket connection closed');
     setTimeout(() => {
-      dgConnection.requestClose();
+      dgConnection.finish();
       console.log('🧹 Gracefully ended Deepgram session (via socket close)');
     }, 2000);
   });
