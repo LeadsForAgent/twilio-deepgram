@@ -16,7 +16,7 @@ wss.on('connection', function connection(ws) {
   let audioBufferQueue = [];
 
   // ✅ Set up Deepgram live transcription with correct headers
-  const dgConnection = dgClient.transcript.live({
+  const dgConnection = dgClient.listen.live({
     model: 'nova',
     language: 'en-US',
     smart_format: true,
