@@ -37,7 +37,7 @@ app.post('/gather-response', (req, res) => {
   console.log('🎯 Key pressed, starting stream...');
   const response = new VoiceResponse();
   response.start().stream({
-    url: 'wss://twilio-deepgram-et1q.onrender.com/ws'
+    url: 'wss://twilio-deepgram-et1q.onrender.com'
   });
   response.say("You may begin speaking now.");
   response.pause({ length: 999 });
@@ -112,6 +112,7 @@ wss.on('connection', ws => {
 
 // ✅ Start Server
 const PORT = process.env.PORT || 10000;
-server.listen(PORT, () => {
+server.
+(PORT, () => {
   console.log(`✅ Server listening on http://0.0.0.0:${PORT}`);
 });
