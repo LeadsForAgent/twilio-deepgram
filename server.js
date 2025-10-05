@@ -48,7 +48,7 @@ app.post('/gather-response', (req, res) => {
 async function getGPTReply(text) {
   try {
     const completion = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
+      model: "gpt-4o",
       messages: [
         { role: 'system', content: 'You are a helpful real estate assistant named Ava.' },
         { role: 'user', content: text }
@@ -100,18 +100,18 @@ wss.on('connection', ws => {
 
     if (parsed.event === 'stop') {
       console.log('⛔ Stream stopped');
-      dgStream.finish();
+      dgStream.requestClose();
     }
   });
 
   ws.on('close', () => {
     console.log("🔒 WebSocket closed");
-    dgStream.finish();
+    dgStream.requestClose();
   });
 });
 
 // ✅ Start Server
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => {
   console.log(`✅ Server listening on http://0.0.0.0:${PORT}`);
 });
