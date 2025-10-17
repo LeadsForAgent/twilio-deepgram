@@ -24,10 +24,11 @@ wss.on('connection', function connection(ws) {
     interim_results: true,
     encoding: 'mulaw',
     sample_rate: 8000,
-    channels: 1
-  }, {
+    channels: 1,
+  headers: {
     'Content-Type': 'audio/x-raw;encoding=mulaw;rate=8000;channels=1'
-  });
+  }
+});
 
   dgConnection.on('open', () => {
     console.log('✅ Deepgram connection opened');
