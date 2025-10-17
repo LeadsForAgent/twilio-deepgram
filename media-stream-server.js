@@ -96,15 +96,14 @@ wss.on('connection', function connection(ws) {
   // ✅ Send to Deepgram
   dgConnection.send(audio);
 
-  // ✅ Write to local file for debugging (optional)
-  audioStream.write(audio);
-}
+
+    }
 
 
     if (data.event === 'stop') {
       console.log('⛔ Streaming stopped by Twilio');
       setTimeout(() => {
-        dgConnection.finish();
+        dgConnection.requestClose();
         console.log('🧹 Gracefully ended Deepgram session (via stop event)');
       }, 2000);
     }
@@ -113,7 +112,7 @@ wss.on('connection', function connection(ws) {
   ws.on('close', () => {
     console.log('🔒 WebSocket connection closed');
     setTimeout(() => {
-      dgConnection.finish();
+      dgConnection.requestClose();
       console.log('🧹 Gracefully ended Deepgram session (via socket close)');
     }, 2000);
   });
