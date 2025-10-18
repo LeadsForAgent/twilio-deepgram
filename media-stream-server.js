@@ -47,29 +47,30 @@ wss.on('connection', function connection(ws) {
     console.log('🛑 Deepgram connection closed');
   });
 
-  dgConnection.on('transcriptReceived', async (data) => {
+  dgConnection.on('transcription', async (data) => {
     const transcript = data.channel?.alternatives?.[0]?.transcript;
+
     if (transcript && transcript.trim() !== '') {
-      console.log('📝 Transcript:', transcript);
+        console.log('📝 Transcript:', transcript);
 
-      try {
-        const response = await openai.chat.completions.create({
-          model: 'gpt-4o',
-          messages: [
-            { role: 'system', content: 'You are Ava, a helpful assistant.' },
-            { role: 'user', content: transcript }
-          ],
-          temperature: 0.7
-        });
+        try {
+            const response = await openai.chat.completions.create({
+                model: 'gpt-4o',
+                messages: [
+                    { role: 'system', content: 'You are Ava, a helpful assistant.' },
+                    { role: 'user', content: transcript }
+                ],
+                temperature: 0.7
+            });
 
-        const reply = response.choices?.[0]?.message?.content;
-        console.log('🤖 GPT Reply:', reply || '❌ Empty GPT reply');
+            const reply = response.choices?.[0]?.message?.content;
+            console.log('🤖 GPT Reply:', reply || '❌ Empty GPT reply');
 
-      } catch (err) {
-        console.error('❌ GPT Error:', err.response?.data || err.message);
-      }
+        } catch (err) {
+            console.error('❌ GPT Error:', err.response?.data || err.message);
+        }
     }
-  });
+});
 
   ws.on('message', function incoming(message) {
     let data;
