@@ -80,26 +80,30 @@ async function getGPTReply(text) {
 wss.on('connection', ws => {
   console.log('🔌 Twilio Media Stream connected');
 
-  const dgStream = deepgram.listen.live({
-    model: 'nova',
-    language: 'en-US',
-    smart_format: true,
-    punctuate: true,
-    interim_results: true,
+  const dgStream = deepgram.listen.live();
+
+dgStream.on('open', () => {
+  console.log('✅ Deepgram stream opened');
+
+  dgStream.configure({
+    model: 'phonecall',
     encoding: 'mulaw',
     sample_rate: 8000,
     channels: 1,
-    headers: {
-      'Content-Type': 'audio/x-raw;encoding=mulaw;rate=8000;channels=1'
-    }
+    punctuate: true,
+    interim_results: false,
+    endpointing: 100
   });
+});
+
+
 
   dgStream.on('open', () => console.log("✅ Deepgram connected"));
   dgStream.on('error', err => console.error("❌ Deepgram error:", err));
   dgStream.on('close', () => console.log("🛑 Deepgram closed"));
 
   // ✅ Listen for real-time transcription events
-  dgStream.on('transcription', async (data) => {
+ dgStream.on('transcriptReceived', async (data) => {
     const transcript = data.channel?.alternatives?.[0]?.transcript;
 
     if (transcript && transcript.trim() !== '') {
@@ -131,7 +135,7 @@ wss.on('connection', ws => {
         console.warn('⚠ Received EMPTY audio chunk');
       } else {
         console.log(`📦 Received audio chunk | Size: ${audio.length} bytes`);
-        dgStream.send(audio); // ✅ Send audio to Deepgram
+        dgStream.write(audio);// ✅ Send audio to Deepgram
       }
     }
 
