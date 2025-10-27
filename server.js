@@ -135,7 +135,7 @@ dgStream.on('open', () => {
         console.warn('⚠ Received EMPTY audio chunk');
       } else {
         console.log(`📦 Received audio chunk | Size: ${audio.length} bytes`);
-        dgStream.write(audio);// ✅ Send audio to Deepgram
+        dgStream.send(audio); 
       }
     }
 
