@@ -94,6 +94,8 @@ dgStream.on('open', () => {
     interim_results: false,
     endpointing: 100
   });
+  
+  console.log('✅ Deepgram follows thru');
 });
 
 
