@@ -107,12 +107,13 @@ dgStream.on('open', () => {
   // ✅ Listen for real-time transcription events
  dgStream.on('transcriptReceived', async (data) => {
     const transcript = data.channel?.alternatives?.[0]?.transcript;
-
+ console.log('✅  Testing 1');
     if (transcript && transcript.trim() !== '') {
       console.log('📝 Transcript:', transcript);
       const reply = await getGPTReply(transcript);
       console.log('🤖 GPT Reply:', reply);
     }
+    console.log('✅  Testing 2')
   });
 
   /* ==========================================================
