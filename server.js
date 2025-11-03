@@ -80,32 +80,25 @@ async function getGPTReply(text) {
 wss.on('connection', ws => {
   console.log('🔌 Twilio Media Stream connected');
 
-  const dgStream = deepgram.listen.live();
-
-dgStream.on('open', () => {
-  console.log('✅ Deepgram stream opened');
-
-  dgStream.configure({
+  const dgStream = deepgram.transcription.live({
     model: 'phonecall',
+    language: 'en-US',
     encoding: 'mulaw',
     sample_rate: 8000,
     channels: 1,
+    smart_format: true,
     punctuate: true,
     interim_results: false,
     endpointing: 100
   });
-});
 
-
-
-  dgStream.on('open', () => console.log("✅ Deepgram connected"));
+  dgStream.on('open', () => console.log("✅ Deepgram stream opened"));
   dgStream.on('error', err => console.error("❌ Deepgram error:", err));
-  dgStream.on('close', () => console.log("🛑 Deepgram closed"));
+  dgStream.on('close', () => console.log("🛑 Deepgram stream closed"));
 
-  // ✅ Listen for real-time transcription events
- dgStream.on('transcriptReceived', async (data) => {
+  // ✅ Correct transcription event
+  dgStream.on('transcript', async (data) => {
     const transcript = data.channel?.alternatives?.[0]?.transcript;
-
     if (transcript && transcript.trim() !== '') {
       console.log('📝 Transcript:', transcript);
       const reply = await getGPTReply(transcript);
@@ -113,9 +106,7 @@ dgStream.on('open', () => {
     }
   });
 
-  /* ==========================================================
-     Incoming Twilio Audio Events
-  ========================================================== */
+  /* Incoming Audio From Twilio */
   ws.on('message', msg => {
     let parsed;
     try {
@@ -132,17 +123,17 @@ dgStream.on('open', () => {
     if (parsed.event === 'media') {
       const audio = Buffer.from(parsed.media.payload, 'base64');
       if (!audio || audio.length === 0) {
-        console.warn('⚠ Received EMPTY audio chunk');
+        console.warn('⚠️ Received EMPTY audio chunk');
       } else {
         console.log(`📦 Received audio chunk | Size: ${audio.length} bytes`);
-        dgStream.send(audio); 
+        dgStream.send(audio); // ✅ Use send()
       }
     }
 
     if (parsed.event === 'stop') {
       console.log('⛔ Stream stopped by Twilio');
       setTimeout(() => {
-        dgStream.requestClose();
+        dgStream.finish(); // ✅ Use finish() instead of requestClose()
         console.log('🧹 Gracefully ended Deepgram session (via stop event)');
       }, 2000);
     }
@@ -151,7 +142,7 @@ dgStream.on('open', () => {
   ws.on('close', () => {
     console.log("🔒 WebSocket closed");
     setTimeout(() => {
-      dgStream.requestClose();
+      dgStream.finish();
       console.log('🧹 Gracefully ended Deepgram session (via socket close)');
     }, 2000);
   });
