@@ -14,14 +14,12 @@ const server = http.createServer(app);
 const wss = new WebSocket.Server({ server, path: '/ws' });
 const { VoiceResponse } = twiml;
 
-/* ==========================================================
-   ✅  Express Middleware
-========================================================== */
+// ✅ Express Middleware
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
 
 /* ==========================================================
-   1️⃣  Twilio Entry Point: Answer Incoming Call
+   1️⃣ Twilio Entry Point: Answer the Incoming Call
 ========================================================== */
 app.post('/voice', (req, res) => {
   console.log('📞 Incoming call');
@@ -39,13 +37,13 @@ app.post('/voice', (req, res) => {
 });
 
 /* ==========================================================
-   2️⃣  Start Media Stream After Key Press
+   2️⃣ Start Media Stream After Key Press
 ========================================================== */
 app.post('/gather-response', (req, res) => {
   console.log('🎯 Key pressed, starting stream...');
   const response = new VoiceResponse();
 
-  // Twilio will stream audio here
+  // Twilio will stream audio here:
   response.start().stream({
     url: 'wss://twilio-deepgram-et1q.onrender.com/ws'
   });
@@ -56,7 +54,7 @@ app.post('/gather-response', (req, res) => {
 });
 
 /* ==========================================================
-   3️⃣  GPT Helper Function
+   3️⃣ GPT Helper Function
 ========================================================== */
 async function getGPTReply(text) {
   try {
@@ -68,6 +66,7 @@ async function getGPTReply(text) {
       ],
       temperature: 0.7
     });
+
     return completion.choices[0].message.content.trim();
   } catch (err) {
     console.error("❌ GPT Error:", err.message);
@@ -76,57 +75,48 @@ async function getGPTReply(text) {
 }
 
 /* ==========================================================
-   4️⃣  WebSocket Server — Twilio → Deepgram → GPT
+   4️⃣ WebSocket Server — Twilio → Deepgram → GPT
 ========================================================== */
-wss.on('connection', async (ws) => {
+wss.on('connection', ws => {
   console.log('🔌 Twilio Media Stream connected');
 
-  // ✅ Initialize Deepgram live transcription
-  const dgStream = await deepgram.transcription.live({
-    model: 'phonecall',
+  const dgStream = deepgram.listen.live({
+    model: 'nova',
+    language: 'en-US',
+    smart_format: true,
+    punctuate: true,
+    interim_results: true,
     encoding: 'mulaw',
     sample_rate: 8000,
     channels: 1,
-    punctuate: true,
-    interim_results: false,
-    endpointing: 100
-  });
-
-  console.log('✅ Deepgram stream created');
-
-  /* ----------------------------------------------------------
-     Deepgram WebSocket Events
-  ---------------------------------------------------------- */
-  dgStream.on('open', () => console.log('🎧 Deepgram WebSocket connected'));
-  dgStream.on('close', () => console.log('🛑 Deepgram WebSocket closed'));
-  dgStream.on('error', (err) => console.error('⚠️ Deepgram WebSocket error:', err));
-
-  // ✅ Handle transcript messages (v4.4+ uses generic 'message' event)
-  dgStream.addListener('message', async (message) => {
-    try {
-      const data = JSON.parse(message);
-      if (data.type === 'Results' && data.channel?.alternatives?.[0]?.transcript) {
-        const transcript = data.channel.alternatives[0].transcript.trim();
-        if (transcript) {
-          console.log('🧠 Full Deepgram Data:', JSON.stringify(data, null, 2));
-          console.log('📝 Transcript:', transcript);
-          const reply = await getGPTReply(transcript);
-          console.log('🤖 GPT Reply:', reply);
-        }
-      }
-    } catch (err) {
-      console.error('❌ Error parsing Deepgram message:', err);
+    headers: {
+      'Content-Type': 'audio/x-raw;encoding=mulaw;rate=8000;channels=1'
     }
   });
 
-  /* ----------------------------------------------------------
-     Handle Twilio Incoming Audio Frames
-  ---------------------------------------------------------- */
-  ws.on('message', (msg) => {
+  dgStream.on('open', () => console.log("✅ Deepgram connected"));
+  dgStream.on('error', err => console.error("❌ Deepgram error:", err));
+  dgStream.on('close', () => console.log("🛑 Deepgram closed"));
+
+  // ✅ Listen for real-time transcription events
+  dgStream.on('transcription', async (data) => {
+    const transcript = data.channel?.alternatives?.[0]?.transcript;
+
+    if (transcript && transcript.trim() !== '') {
+      console.log('📝 Transcript:', transcript);
+      const reply = await getGPTReply(transcript);
+      console.log('🤖 GPT Reply:', reply);
+    }
+  });
+
+  /* ==========================================================
+     Incoming Twilio Audio Events
+  ========================================================== */
+  ws.on('message', msg => {
     let parsed;
     try {
       parsed = JSON.parse(msg);
-    } catch {
+    } catch (e) {
       console.warn('⚠️ Non-JSON message received. Ignored.');
       return;
     }
@@ -137,36 +127,34 @@ wss.on('connection', async (ws) => {
 
     if (parsed.event === 'media') {
       const audio = Buffer.from(parsed.media.payload, 'base64');
-      if (!audio?.length) {
-        console.warn('⚠️ Received EMPTY audio chunk');
+      if (!audio || audio.length === 0) {
+        console.warn('⚠ Received EMPTY audio chunk');
       } else {
-        dgStream.send(audio);
+        console.log(`📦 Received audio chunk | Size: ${audio.length} bytes`);
+        dgStream.send(audio); // ✅ Send audio to Deepgram
       }
     }
 
     if (parsed.event === 'stop') {
       console.log('⛔ Stream stopped by Twilio');
       setTimeout(() => {
-        dgStream.finish();
-        console.log('🧹 Gracefully closed Deepgram stream (Twilio stop)');
-      }, 1500);
+        dgStream.requestClose();
+        console.log('🧹 Gracefully ended Deepgram session (via stop event)');
+      }, 2000);
     }
   });
 
-  /* ----------------------------------------------------------
-     Handle Socket Closure
-  ---------------------------------------------------------- */
   ws.on('close', () => {
-    console.log('🔒 WebSocket closed by Twilio');
+    console.log("🔒 WebSocket closed");
     setTimeout(() => {
-      dgStream.finish();
-      console.log('🧹 Gracefully closed Deepgram stream (socket close)');
-    }, 1500);
+      dgStream.requestClose();
+      console.log('🧹 Gracefully ended Deepgram session (via socket close)');
+    }, 2000);
   });
 });
 
 /* ==========================================================
-   5️⃣  Start the Server
+   5️⃣ Start the Server
 ========================================================== */
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => {
