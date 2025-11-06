@@ -104,22 +104,26 @@ dgStream.on('open', () => {
   dgStream.on('error', err => console.error("❌ Deepgram error:", err));
   dgStream.on('close', () => console.log("🛑 Deepgram closed"));
 
-  // ✅ Listen for real-time transcription events
- dgStream.on('transcript', async (data) => {
-  // Print the full payload for debugging
-  console.log('🧠 Full Deepgram Data:', JSON.stringify(data, null, 2));
+ dgStream.addListener('message', async (message) => {
+  try {
+    const data = JSON.parse(message);
+    if (data.type === 'Results') {
+      console.log('🧠 Full Deepgram Data:', JSON.stringify(data, null, 2));
 
-  // Extract transcript safely for v4 format
-  const transcript = data?.results?.channels?.[0]?.alternatives?.[0]?.transcript;
-
-  console.log('✅ Testing 1');
-  if (transcript && transcript.trim() !== '') {
-    console.log('📝 Transcript:', transcript);
-    const reply = await getGPTReply(transcript);
-    console.log('🤖 GPT Reply:', reply);
+      const transcript = data.channel?.alternatives?.[0]?.transcript;
+      if (transcript && transcript.trim() !== '') {
+        console.log('✅ Testing 1');
+        console.log('📝 Transcript:', transcript);
+        const reply = await getGPTReply(transcript);
+        console.log('🤖 GPT Reply:', reply);
+        console.log('✅ Testing 2');
+      }
+    }
+  } catch (err) {
+    console.error('❌ Error parsing Deepgram message:', err);
   }
-  console.log('✅ Testing 2');
 });
+
 
 
   /* ==========================================================
