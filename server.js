@@ -3,7 +3,7 @@ const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
 const { twiml } = require('twilio');
-const { createClient } = require('@deepgram/sdk');
+const { createClient, LiveTranscriptionEvents } = require('@deepgram/sdk');
 const { OpenAI } = require('openai');
 
 const deepgram = createClient(process.env.DEEPGRAM_API_KEY);
@@ -59,7 +59,7 @@ app.post('/gather-response', (req, res) => {
 async function getGPTReply(text) {
   try {
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: 'gpt-4o',
       messages: [
         { role: 'system', content: 'You are Ava, a friendly real estate assistant.' },
         { role: 'user', content: text }
@@ -69,7 +69,7 @@ async function getGPTReply(text) {
 
     return completion.choices[0].message.content.trim();
   } catch (err) {
-    console.error("❌ GPT Error:", err.message);
+    console.error('❌ GPT Error:', err.message);
     return "Sorry, I didn't get that.";
   }
 }
@@ -77,50 +77,65 @@ async function getGPTReply(text) {
 /* ==========================================================
    4️⃣ WebSocket Server — Twilio → Deepgram → GPT
 ========================================================== */
-wss.on('connection', ws => {
+wss.on('connection', (ws) => {
   console.log('🔌 Twilio Media Stream connected');
 
-  const dgStream = deepgram.listen.live({
-    model: 'nova',
+  // Live transcription connection (Deepgram v4: listen.live) :contentReference[oaicite:0]{index=0}
+  const dgConnection = deepgram.listen.live({
+    model: 'nova-3',           // live-capable model :contentReference[oaicite:1]{index=1}
     language: 'en-US',
     smart_format: true,
     punctuate: true,
     interim_results: true,
-    encoding: 'mulaw',
+    encoding: 'mulaw',         // Twilio media is MuLaw @ 8kHz :contentReference[oaicite:2]{index=2}
     sample_rate: 8000,
-    channels: 1,
-    headers: {
-      'Content-Type': 'audio/x-raw;encoding=mulaw;rate=8000;channels=1'
+    channels: 1
+  });
+
+  let dgReady = false;
+  const audioQueue = [];
+
+  // Deepgram connection opened
+  dgConnection.on(LiveTranscriptionEvents.Open, () => {
+    console.log('✅ Deepgram connected');
+    dgReady = true;
+
+    // Flush any audio that arrived before Deepgram was ready
+    while (audioQueue.length > 0) {
+      const chunk = audioQueue.shift();
+      dgConnection.send(chunk);
     }
   });
 
-  dgStream.on('open', () => console.log("✅ Deepgram connected"));
-  dgStream.on('error', err => console.error("❌ Deepgram error:", err));
-  dgStream.on('close', () => console.log("🛑 Deepgram closed"));
-
-  dgStream.addListener('message', async (message) => {
+  // Live transcripts from Deepgram :contentReference[oaicite:3]{index=3}
+  dgConnection.on(LiveTranscriptionEvents.Transcript, async (data) => {
     try {
-      const data = JSON.parse(message);
-      if (data.type === 'Results' && data.channel?.alternatives?.[0]?.transcript) {
-        const transcript = data.channel.alternatives[0].transcript.trim();
-        if (transcript) {
-          // 👇 Prints to Render console
-          console.log('📝 Transcript:', transcript);
+      const transcript =
+        data?.channel?.alternatives?.[0]?.transcript;
 
-          // 👇 Get GPT reply (optional)
-          const reply = await getGPTReply(transcript);
-          console.log('🤖 GPT Reply:', reply);
-        }
+      if (transcript && transcript.trim() !== '') {
+        console.log('📝 Transcript:', transcript);
+        const reply = await getGPTReply(transcript);
+        console.log('🤖 GPT Reply:', reply);
       }
     } catch (err) {
-      console.error('❌ Error parsing Deepgram message:', err);
+      console.error('❌ Error handling transcript:', err);
     }
+  });
+
+  // Optional: log close/error from underlying websocket
+  dgConnection.on('close', () => {
+    console.log('🛑 Deepgram closed');
+  });
+
+  dgConnection.on('error', (err) => {
+    console.error('❌ Deepgram error:', err);
   });
 
   /* ==========================================================
      Incoming Twilio Audio Events
   ========================================================== */
-  ws.on('message', msg => {
+  ws.on('message', (msg) => {
     let parsed;
     try {
       parsed = JSON.parse(msg);
@@ -135,29 +150,38 @@ wss.on('connection', ws => {
 
     if (parsed.event === 'media') {
       const audio = Buffer.from(parsed.media.payload, 'base64');
+
       if (!audio || audio.length === 0) {
         console.warn('⚠ Received EMPTY audio chunk');
       } else {
         console.log(`📦 Received audio chunk | Size: ${audio.length} bytes`);
-        dgStream.send(audio); // ✅ Send audio to Deepgram
+
+        // Per Deepgram guidance, send raw Buffer, not base64 string :contentReference[oaicite:4]{index=4}
+        if (dgReady) {
+          dgConnection.send(audio);
+        } else {
+          audioQueue.push(audio);
+        }
       }
     }
 
     if (parsed.event === 'stop') {
       console.log('⛔ Stream stopped by Twilio');
-      setTimeout(() => {
-        dgStream.requestClose();
-        console.log('🧹 Gracefully ended Deepgram session (via stop event)');
-      }, 2000);
+      try {
+        dgConnection.close();
+      } catch (err) {
+        console.error('❌ Error closing Deepgram connection (stop):', err);
+      }
     }
   });
 
   ws.on('close', () => {
-    console.log("🔒 WebSocket closed");
-    setTimeout(() => {
-      dgStream.requestClose();
-      console.log('🧹 Gracefully ended Deepgram session (via socket close)');
-    }, 2000);
+    console.log('🔒 WebSocket closed');
+    try {
+      dgConnection.close();
+    } catch (err) {
+      console.error('❌ Error closing Deepgram connection (ws close):', err);
+    }
   });
 });
 
