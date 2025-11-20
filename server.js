@@ -98,14 +98,22 @@ wss.on('connection', ws => {
   dgStream.on('error', err => console.error("❌ Deepgram error:", err));
   dgStream.on('close', () => console.log("🛑 Deepgram closed"));
 
-  // ✅ Listen for real-time transcription events
-  dgStream.on('transcription', async (data) => {
-    const transcript = data.channel?.alternatives?.[0]?.transcript;
+  dgStream.addListener('message', async (message) => {
+    try {
+      const data = JSON.parse(message);
+      if (data.type === 'Results' && data.channel?.alternatives?.[0]?.transcript) {
+        const transcript = data.channel.alternatives[0].transcript.trim();
+        if (transcript) {
+          // 👇 Prints to Render console
+          console.log('📝 Transcript:', transcript);
 
-    if (transcript && transcript.trim() !== '') {
-      console.log('📝 Transcript:', transcript);
-      const reply = await getGPTReply(transcript);
-      console.log('🤖 GPT Reply:', reply);
+          // 👇 Get GPT reply (optional)
+          const reply = await getGPTReply(transcript);
+          console.log('🤖 GPT Reply:', reply);
+        }
+      }
+    } catch (err) {
+      console.error('❌ Error parsing Deepgram message:', err);
     }
   });
 
