@@ -1,3 +1,4 @@
+console.log("Deepgram SDK Version:", require("@deepgram/sdk/package.json").version);
 require('dotenv').config();
 const express = require('express');
 const http = require('http');
